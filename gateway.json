@@ -1,0 +1,138 @@
+{
+    "industryProperties": [
+        {
+            "identifier": "DoReset",
+            "name": "复位重启",
+            "value": 0,
+            "accessMode": 2,
+            "type": 3,
+            "required": true,
+            "unit": "",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+        },
+        {
+            "identifier": "VersionInfo",
+            "name": "版本信息",
+            "value": "0.0.1",
+            "accessMode": 1,
+            "type": 1,
+            "required": true,
+            "special": {
+                "length": 255
+            }
+        },
+        {
+            "identifier": "Architecture",
+            "name": "硬件架构",
+            "value": "x86_64",
+            "accessMode": 1,
+            "type": 1,
+            "required": true,
+            "special": {
+                "length": 255
+            }
+        },
+        {
+            "identifier": "MACAddress",
+            "name": "物理地址",
+            "value": "74:d4:35:45:cd:e4",
+            "accessMode": 1,
+            "type": 1,
+            "required": true,
+            "special": {
+                "length": 255
+            }
+        },
+        {
+            "identifier": "IPAddress",
+            "name": "网络地址",
+            "value": "192.168.50.40",
+            "accessMode": 2,
+            "type": 1,
+            "required": true,
+            "special": {
+                "length": 255
+            }
+        },
+        {
+            "identifier": "Hostname",
+            "name": "主机名称",
+            "value": "brix",
+            "accessMode": 2,
+            "type": 1,
+            "required": true,
+            "special": {
+                "length": 255
+            }
+        },
+        {
+            "identifier": "DeviceStatus",
+            "name": "设备状态",
+            "accessMode": 1,
+            "value": "RUNNING",
+            "type": 1,
+            "required": true,
+            "special": {
+                "length": 64
+            }
+        },
+        {
+            "identifier": "Address",
+            "name": "设备位置",
+            "value": "招商街道南海大道1057号蛇口科技大厦2期A座三楼",
+            "accessMode": 2,
+            "type": 1,
+            "required": true,
+            "special": {
+                "length": 255
+            }
+        },
+        {
+            "identifier": "Department",
+            "name": "部门名称",
+            "value": "CMFT",
+            "accessMode": 2,
+            "type": 1,
+            "required": true,
+            "special": {
+                "length": 255
+            }
+        },
+        {
+            "identifier": "SerialNo",
+            "name": "设备序列号",
+            "value": "J390932E07624",
+            "accessMode": 1,
+            "type": 1,
+            "required": true,
+            "special": {
+                "length": 255
+            }
+        },
+        {
+            "identifier": "Model",
+            "name": "设备型号",
+            "value": "MMLP7AP-BC",
+            "accessMode": 1,
+            "type": 1,
+            "required": true,
+            "special": {
+                "length": 255
+            }
+        },
+        {
+            "identifier": "Manufacturer",
+            "name": "生产制造商",
+            "value": "GIGABYTE",
+            "accessMode": 1,
+            "type": 1,
+            "required": true,
+            "special": {
+                "length": 255
+            }
+        }
+    ],
+    "industryAffairs": [],
+    "industryServices": []
+}
