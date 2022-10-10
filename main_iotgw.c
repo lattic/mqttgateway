@@ -6,14 +6,11 @@
 #include "iotgw_utils.h"
 #include "iotgw_mqtt_client.h"
 #include "iotgw_cmft.h"
-
-#define IOTGW_DEFAULT_PRODUCT_ID    "104841"
-#define IOTGW_DEFAULT_DEVICE_ID     "10654986"
-#define IOTGW_DEFAULT_SECRET        "Y2JjOWRhNzI2N2M5ZjdjM2JkZmY="
+#include "dbg_printf.h"
 
 int main(int argc, char **argv)
 {
-    printf("IOT MQTT Gateway Started\n");
+    INFO_PRT("IOT MQTT Gateway Started");
 
     iotgw_mqtt_init();
 
