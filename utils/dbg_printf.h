@@ -47,6 +47,11 @@
 		syslog(LOG_DEBUG, fmt, ##__VA_ARGS__); \
 	} while(0)
 
+#define DBG_PRT_N(fmt, ...) do { \
+		fprintf(stdout, fmt, ##__VA_ARGS__); \
+		syslog(LOG_DEBUG, fmt, ##__VA_ARGS__); \
+	} while(0)
+
 #define DBG_FUNC(fmt, ...) do { \
 		fprintf(stdout, "%s: " fmt "\n", __FUNCTION__, ##__VA_ARGS__); \
 		syslog(LOG_DEBUG, "%s: " fmt, __FUNCTION__, ##__VA_ARGS__); \
@@ -58,6 +63,7 @@
 	} while (0)
 #else
 #define DBG_PRT(fmt, ...) 
+#define DBG_PRT_N(fmt, ...) 
 #define DBG_FUNC(fmt, ...) 
 #define ERR_FUNC(fmt, ...) 
 #endif
