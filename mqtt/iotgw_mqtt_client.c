@@ -12,6 +12,7 @@
 #include "MQTTAsync.h"
 #include "json-c/json.h"
 
+#include "iotgw.h"
 #include "iotgw_utils.h"
 #include "iotgw_mqtt_client.h"
 #include "dbg_printf.h"
@@ -132,7 +133,7 @@ void onPublishSuccess(void *context, MQTTAsync_successData *response)
 	ctx->state |= MQTT_CONN_STATE_PUBLISH_SUCCESS;
 	ctx->state &= ~MQTT_CONN_STATE_PUBLISH_FAIL;
 
-	DBG_PRT("Publish message token=%d CONFIRMED SUCCESS", response->token);
+	// DBG_PRT("Publish message token=%d CONFIRMED SUCCESS", response->token);
 
 	if (ctx && ctx->onPublishSuccess && response)
 		(*(ctx->onPublishSuccess))(ctx,
@@ -164,6 +165,7 @@ void onConnectFailure(void *context, MQTTAsync_failureData *response)
 
 /*
  * Called if the connect successfully completes
+ * Such as subscribe should be implemented
  */
 void onConnect(void *context, MQTTAsync_successData *response)
 {
@@ -250,14 +252,14 @@ int iotgw_mqtt_connect(struct iotgw_mqtt_conn *mqttConn)
 	}
 
 	/* Waiting for connection in other thread */
-	waitcount = IOTGW_MQTT_TIMEOUT;
+	waitcount = (IOTGW_MQTT_TIMEOUT * 1000000 / IOTGW_MQTT_TICKER);
     while (waitcount-- > 0 && (mqttConn->state & MQTT_CONN_STATE_QUIT) == 0) {
-        if ((mqttConn->state & MQTT_CONN_STATE_CONNECTED) == 1) {
+        if (MQTTAsync_isConnected(mqttConn->handle)) {
             break;
 		}
         usleep(IOTGW_MQTT_TICKER);
     }
-    if (waitcount == 0 && (mqttConn->state & MQTT_CONN_STATE_CONNECTED) != 1) {
+    if (waitcount == 0 && !MQTTAsync_isConnected(mqttConn->handle)) {
 		LOG_PRT("Waiting for MQTT CONNECT TIMEOUT");
 		rc = MQTTASYNC_FAILURE;
 		goto ret;
@@ -297,7 +299,7 @@ int iotgw_mqtt_disconnect(struct iotgw_mqtt_conn *mqttConn)
 	}
 
 	/* Waiting for dis-connection in other thread */
-    waitcount = IOTGW_MQTT_TIMEOUT;
+    waitcount = (IOTGW_MQTT_TIMEOUT * 1000000 / IOTGW_MQTT_TICKER);
     while (waitcount-- > 0) {
         if ((mqttConn->state & MQTT_CONN_STATE_CONNECTED) == 0) {
             break;
@@ -356,3 +358,18 @@ int iotgw_mqtt_publish(struct iotgw_mqtt_conn *mqttConn, char *topic, void *payl
 	return rc;
 }
 
+/*
+ * Waits for all request to be completed
+ */
+void iotgw_mqtt_waitForAllCompletion(MQTTAsync handle, unsigned long timeout)
+{
+	MQTTAsync_token token, *next = NULL;
+
+	if (MQTTAsync_getPendingTokens(handle, &next) != MQTTASYNC_SUCCESS || next == NULL || *next == -1)
+		return;
+	
+	while ((token = *next++) != -1) {
+		// DBG_PRT("Waits request token=%04d to be completed", token);
+		MQTTAsync_waitForCompletion(handle, token, timeout);
+	}
+}

@@ -1,0 +1,10 @@
+{
+    "gateway": {
+        "productId": "104841",
+        "deviceId": "10654986",
+        "secret": "Y2JjOWRhNzI2N2M5ZjdjM2JkZmY=",
+        "token": "version=1&res=products%2F104841%2Fdevices%2F10654986&et=1728553679&method=sha1&sign=B0w9bCD7X%2BjZGVFKXtFnhkdphCs%3D"
+    },
+    "OnlineSubDeviceCount": 0,
+    "TotalSubDeviceCount": 0
+}

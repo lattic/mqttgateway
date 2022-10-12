@@ -8,10 +8,8 @@
 
 #include "MQTTAsync.h"
 
-#define IOTGW_DEFAULT_QOS               1
-#define IOTGW_DEFAULT_KEEPALIVE         30
-#define IOTGW_MQTT_TICKER               100000  /* MQTT Ticker us */
-#define IOTGW_MQTT_TIMEOUT              50      /* For ticker period */
+#define IOTGW_MQTT_TICKER               25000   /* MQTT Ticker us */
+#define IOTGW_MQTT_TIMEOUT              5      /* For 5 seconds */
 #define IOTGW_RETRY_TIMES               3
 #define IOTGW_SERVERURI_LENGTH          256
 #define IOTGW_CLIENTID_LENGTH           256
@@ -28,7 +26,6 @@ enum {
 
     MQTT_CONN_STATE_QUIT = 0x80
 };
-
 
 typedef struct iotgw_mqtt_conn {
     MQTTAsync handle;
@@ -80,5 +77,10 @@ void iotgw_mqtt_setdef(struct iotgw_mqtt_conn *mqttConn);
  * Publish message to MQTT Server TOPIC
  */
 int iotgw_mqtt_publish(struct iotgw_mqtt_conn *mqttConn, char *topic, void* payload, int payloadlen, int qos, int * token);
+
+/*
+ * Waits for all request to be completed
+ */
+void iotgw_mqtt_waitForAllCompletion(MQTTAsync handle, unsigned long timeout);
 
 #endif /* _IOTGW_MQTT_CLIENT_H_ */

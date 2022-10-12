@@ -9,17 +9,13 @@
 #include "MQTTAsync.h"
 #include "json-c/json.h"
 
-#include "iotgw_mqtt_client.h"
+#include "iotgw.h"
 #include "iotgw_cmft.h"
+#include "iotgw_mqtt_client.h"
 #include "iotgw_utils.h"
 #include "dbg_printf.h"
 
-#define IOTGW_DEFAULT_PRODUCT_ID    "104841"
-#define IOTGW_DEFAULT_DEVICE_ID     "10654986"
-#define IOTGW_DEFAULT_SECRET        "Y2JjOWRhNzI2N2M5ZjdjM2JkZmY="
-
-static struct iotgw_mqtt_conn mqtt_conn;
-int OnlineSubDeviceCount = -1, TotalSubDeviceCount = -1;
+static struct iotgw_dev gwdev;
 
 /* Called if the connect successfully completes */
 void onConnectSuccess(struct iotgw_mqtt_conn *mqttConn, char* serverURI, int MQTTVersion);
@@ -29,23 +25,31 @@ int onMessageArrived(struct iotgw_mqtt_conn *mqttConn, char* topicName, int topi
 
 int iotgw_mqtt_init()
 {
-    char token[IOTGW_CMFT_TOKEN_LEN];
-    int retval = 0, waitcount;
+    char token[IOTGW_TOKEN_LEN];
+    int retval = -1, waitcount;
+    struct iotgw_mqtt_conn *mqttConn = &gwdev.mqttConn;
 
-    iotgw_mqtt_setdef(&mqtt_conn);
-    strncpy(mqtt_conn.serverURI, IOTGW_CMFT_SERVER_URI, sizeof(mqtt_conn.serverURI) - 1);
-    strncpy(mqtt_conn.clientUsername, IOTGW_DEFAULT_PRODUCT_ID, sizeof(mqtt_conn.clientUsername) - 1);
-    strncpy(mqtt_conn.clientId, IOTGW_DEFAULT_DEVICE_ID, sizeof(mqtt_conn.clientId) - 1);
-    iot_cmft_get_token_mqtt(IOTGW_DEFAULT_PRODUCT_ID, IOTGW_DEFAULT_DEVICE_ID, IOTGW_DEFAULT_SECRET, token, sizeof(token));
-    strncpy(mqtt_conn.clientPassword, token, sizeof(mqtt_conn.clientPassword) - 1);
-    mqtt_conn.onConnectSuccess = onConnectSuccess;
-    mqtt_conn.onMessageArrived = onMessageArrived;
+    memset(&gwdev, 0, sizeof(struct iotgw_dev));
+    mqttConn = &gwdev.mqttConn;
+    if (iotgw_load_conf(&gwdev, IOTGW_CONFIG_FILE) != 0) {
+        ERR_PRT("Fail to load gateway config from " IOTGW_CONFIG_FILE);
+        goto ret;
+    }
 
-    LOG_PRT("Initializing CMFT_MQTT_Gateway as URI=%s PID=%s DID=%s SEC=%s", mqtt_conn.serverURI,
-        mqtt_conn.clientUsername, mqtt_conn.clientId, IOTGW_DEFAULT_SECRET);
-    DBG_PRT("PWD=%s", mqtt_conn.clientPassword);
+    /* Initialize MQTT Connection */
+    iotgw_mqtt_setdef(mqttConn);
+    strncpy(mqttConn->serverURI, IOTGW_CMFT_SERVER_URI, sizeof(mqttConn->serverURI) - 1);
+    strncpy(mqttConn->clientUsername, gwdev.pid, sizeof(mqttConn->clientUsername) - 1);
+    strncpy(mqttConn->clientId, gwdev.did, sizeof(mqttConn->clientId) - 1);
+    strncpy(mqttConn->clientPassword, gwdev.token, sizeof(mqttConn->clientPassword) - 1);
+    mqttConn->onConnectSuccess = onConnectSuccess;
+    mqttConn->onMessageArrived = onMessageArrived;
 
-    if (iotgw_mqtt_connect(&mqtt_conn) != MQTTASYNC_SUCCESS) {
+    LOG_PRT("Initializing CMFT_MQTT_Gateway as URI=%s PID=%s DID=%s SEC=%s", mqttConn->serverURI,
+        gwdev.pid, gwdev.did, gwdev.sec);
+    DBG_PRT("PWD=%s", mqttConn->clientPassword);
+
+    if (iotgw_mqtt_connect(mqttConn) != MQTTASYNC_SUCCESS) {
         retval = -1;
         goto ret;
     }
@@ -58,32 +62,57 @@ ret:
 
 int iotgw_mqtt_exit()
 {
-    INFO_PRT("Try to DISCONNECT from %s PID=%s DID=%s\n", mqtt_conn.serverURI, mqtt_conn.clientUsername, mqtt_conn.clientId);
-    iotgw_mqtt_disconnect(&mqtt_conn);
-
-ret:
+    DBG_PRT("Try to DISCONNECT from %s PID=%s DID=%s", gwdev.mqttConn.serverURI, gwdev.mqttConn.clientUsername, gwdev.mqttConn.clientId);
+    iotgw_mqtt_disconnect(&gwdev.mqttConn);
     return 0;
-}
-
-/* Called if the connect successfully completes */
-void onConnectSuccess(struct iotgw_mqtt_conn *mqttConn, char* serverURI, int MQTTVersion)
-{
 }
 
 void iotgw_mqtt_proc()
 {
-    int waitcount;
+    struct iotgw_mqtt_conn *mqttConn = &gwdev.mqttConn;
+    int waitcount, i;
 
-    iotgw_cmft_publish_gateway_info(&mqtt_conn, IOTGW_CMFT_CONFIG_FILE);
-    while ((mqtt_conn.state & (MQTT_CONN_STATE_PUBLISH_SUCCESS | MQTT_CONN_STATE_PUBLISH_FAIL)) == 0);
+    if (!MQTTAsync_isConnected(mqttConn->handle))
+        return;
 
-    waitcount = 100;
-    while (waitcount-- > 0) {
-        OnlineSubDeviceCount++;
-        TotalSubDeviceCount++;
-        iotgw_cmft_publish_subdev_info(&mqtt_conn);
-        while ((mqtt_conn.state & (MQTT_CONN_STATE_PUBLISH_SUCCESS | MQTT_CONN_STATE_PUBLISH_FAIL)) == 0);
+    iotgw_cmft_publish_gateway_info(mqttConn, IOTGW_DATA_FILE, 0);
+
+    for (i = 0; i < 30; i++) {
+        waitcount = 50;
+        while (waitcount-- > 0) {
+            gwdev.OnlineSubDeviceCount++;
+            gwdev.TotalSubDeviceCount++;
+            iotgw_cmft_publish_subdev_info(mqttConn, 0);
+        }
+        iotgw_mqtt_waitForAllCompletion(mqttConn->handle, IOTGW_MQTT_TIMEOUT * 1000);
+
+        sleep(15);
     }
+
+}
+
+int iotgw_mqtt_subscribe()
+{
+	MQTTAsync_responseOptions opts = MQTTAsync_responseOptions_initializer;
+	int rc;
+#if 0
+	opts.onSuccess = onSubscribe;
+	opts.onFailure = onSubscribeFailure;
+	opts.context = client;
+	if ((rc = MQTTAsync_subscribe(client, TOPIC, QOS, &opts)) != MQTTASYNC_SUCCESS)
+	{
+		printf("Failed to start subscribe, return code %d\n", rc);
+		finished = 1;
+	}
+#endif
+
+    return 0;
+}
+
+/* Called if the connect successfully completes, Such as subscribe should be implemented */
+void onConnectSuccess(struct iotgw_mqtt_conn *mqttConn, char* serverURI, int MQTTVersion)
+{
+    iotgw_mqtt_subscribe();
 }
 
 /* Called when a new message that matches a client subscription has been received from the server. */
@@ -92,7 +121,7 @@ int onMessageArrived(struct iotgw_mqtt_conn *mqttConn, char* topicName, int topi
     return 1;
 }
 
-int iotgw_cmft_publish_gateway_info(struct iotgw_mqtt_conn *mqttConn, const char *filename)
+int iotgw_cmft_publish_gateway_info(struct iotgw_mqtt_conn *mqttConn, const char *filename, unsigned long waitFinishedMS)
 {
     json_object *jso_root = NULL, *jso_industryProperties = NULL, *jso_item = NULL,
         *jso_identifier = NULL, *jso_params = NULL, *jso_post = NULL;
@@ -134,14 +163,14 @@ int iotgw_cmft_publish_gateway_info(struct iotgw_mqtt_conn *mqttConn, const char
         goto ret;
     }
 
-    /* For dynamic global variables OnlineSubDeviceCount and TotalSubDeviceCount */
+    /* For dynamic message such as global variables OnlineSubDeviceCount and TotalSubDeviceCount */
     jso_identifier = json_object_new_object();
-    json_object_object_add(jso_identifier, "value", json_object_new_int(OnlineSubDeviceCount));
+    json_object_object_add(jso_identifier, "value", json_object_new_int(gwdev.OnlineSubDeviceCount));
     json_object_object_add(jso_identifier, "time", json_object_new_int64(time_curr));
     json_object_object_add(jso_params, "OnlineSubDeviceCount", jso_identifier);
 
     jso_identifier = json_object_new_object();
-    json_object_object_add(jso_identifier, "value", json_object_new_int(TotalSubDeviceCount));
+    json_object_object_add(jso_identifier, "value", json_object_new_int(gwdev.TotalSubDeviceCount));
     json_object_object_add(jso_identifier, "time", json_object_new_int64(time_curr));
     json_object_object_add(jso_params, "TotalSubDeviceCount", jso_identifier);
 
@@ -171,12 +200,17 @@ int iotgw_cmft_publish_gateway_info(struct iotgw_mqtt_conn *mqttConn, const char
     }
 
     /* POST to CMFT IOT */
-    snprintf(topic, sizeof(topic), "$sys/%s/%s/thing/property/post", IOTGW_DEFAULT_PRODUCT_ID, IOTGW_DEFAULT_DEVICE_ID);
+    snprintf(topic, sizeof(topic), "$sys/%s/%s/thing/property/post", gwdev.pid, gwdev.did);
     strncpy(payload, json_object_to_json_string(jso_post), sizeof(payload));
-    DBG_PRT("Publish to TOPIC %s PAYLOAD: %s", topic, payload);
-    iotgw_mqtt_publish(mqttConn, "$sys/" IOTGW_DEFAULT_PRODUCT_ID "/" IOTGW_DEFAULT_DEVICE_ID "/thing/property/post",
-            payload, strlen(payload), 1, &pubtoken);
 
+    DBG_PRT("Publish TOPIC: %s PAYLOAD: %s", topic, payload);
+    if (iotgw_mqtt_publish(mqttConn, topic, payload, strlen(payload), IOTGW_DEFAULT_QOS, &pubtoken) != MQTTASYNC_SUCCESS) {
+        ERR_PRT("Fail to publish gateway information");
+        goto ret;
+    }
+    if (waitFinishedMS != 0) {
+        MQTTAsync_waitForCompletion(mqttConn->handle, pubtoken, waitFinishedMS);
+    }
     retval = 0;
 
 ret:
@@ -195,51 +229,30 @@ ret:
     return retval;
 }
 
-int iotgw_cmft_publish_subdev_info(struct iotgw_mqtt_conn *mqttConn)
+int iotgw_cmft_publish_subdev_info(struct iotgw_mqtt_conn *mqttConn, unsigned long waitFinishedMS)
 {
-    json_object *jso_identifier = NULL, *jso_params = NULL, *jso_post = NULL;
-	int retval = -1, pubtoken;
+	int pubtoken;
     long time_curr;
-    char topic[256], payload[2048], tmpstr[256];
+    char topic[256], payload[2048];
      
-    /* Generate Gateway Device Information based on file gateway.json */
+    /* Generate Sub-Device Information */
     time_curr = time(NULL);
-    snprintf(tmpstr, sizeof(tmpstr) - 1, "%lu", time_curr);
-
-    jso_post = json_object_new_object();
-    json_object_object_add(jso_post, "id", json_object_new_string(tmpstr));
-    json_object_object_add(jso_post, "version", json_object_new_string("1.0"));
-    jso_params = json_object_new_object();
-    json_object_object_add(jso_post, "params", jso_params);
-    if (!jso_post || !jso_params) {
-        ERR_PRT("FAIL: Not enough memory for JSON objects");
-        goto ret;
-    }
-
-    /* For dynamic global variables OnlineSubDeviceCount and TotalSubDeviceCount */
-    jso_identifier = json_object_new_object();
-    json_object_object_add(jso_identifier, "value", json_object_new_int(OnlineSubDeviceCount));
-    json_object_object_add(jso_identifier, "time", json_object_new_int64(time_curr));
-    json_object_object_add(jso_params, "OnlineSubDeviceCount", jso_identifier);
-
-    jso_identifier = json_object_new_object();
-    json_object_object_add(jso_identifier, "value", json_object_new_int(TotalSubDeviceCount));
-    json_object_object_add(jso_identifier, "time", json_object_new_int64(time_curr));
-    json_object_object_add(jso_params, "TotalSubDeviceCount", jso_identifier);
+    snprintf(payload, sizeof(payload) - 1, "{\"id\":\"%lu\",\"version\":\"1.0\",\"params\":{"
+        "\"OnlineSubDeviceCount\":{\"value\":%d,\"time\":%lu},"
+        "\"TotalSubDeviceCount\":{\"value\":%d,\"time\":%lu}" "}}",
+        time_curr,
+        gwdev.OnlineSubDeviceCount, time_curr,
+        gwdev.TotalSubDeviceCount, time_curr);
 
     /* POST to CMFT IOT */
-    snprintf(topic, sizeof(topic), "$sys/%s/%s/thing/property/post", IOTGW_DEFAULT_PRODUCT_ID, IOTGW_DEFAULT_DEVICE_ID);
-    strncpy(payload, json_object_to_json_string(jso_post), sizeof(payload));
-    DBG_PRT("Publish to TOPIC %s PAYLOAD: %s", topic, payload);
-    iotgw_mqtt_publish(mqttConn, "$sys/" IOTGW_DEFAULT_PRODUCT_ID "/" IOTGW_DEFAULT_DEVICE_ID "/thing/property/post",
-            payload, strlen(payload), 1, &pubtoken);
-
-    retval = 0;
-
-ret:
-    if (jso_post != NULL) {
-    	json_object_put(jso_post);
-        jso_post = NULL;
+    snprintf(topic, sizeof(topic), "$sys/%s/%s/thing/property/post", gwdev.pid, gwdev.did);
+    DBG_PRT("Publish TOPIC: %s PAYLOAD: %s", topic, payload);
+    if (iotgw_mqtt_publish(mqttConn, topic, payload, strlen(payload), IOTGW_DEFAULT_QOS, &pubtoken) != MQTTASYNC_SUCCESS) {
+        ERR_PRT("Fail to publish subdev information");
+        return -1;
     }
-    return retval;
+    if (waitFinishedMS != 0) {
+        MQTTAsync_waitForCompletion(mqttConn->handle, pubtoken, waitFinishedMS);
+    }
+    return 0;
 }
