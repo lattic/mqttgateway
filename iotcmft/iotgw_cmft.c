@@ -38,7 +38,7 @@ int iotgw_mqtt_init()
 
     /* Initialize MQTT Connection */
     iotgw_mqtt_setdef(mqttConn);
-    strncpy(mqttConn->serverURI, IOTGW_CMFT_SERVER_URI, sizeof(mqttConn->serverURI) - 1);
+    strncpy(mqttConn->serverURI, gwdev.uri, sizeof(mqttConn->serverURI) - 1);
     strncpy(mqttConn->clientUsername, gwdev.pid, sizeof(mqttConn->clientUsername) - 1);
     strncpy(mqttConn->clientId, gwdev.did, sizeof(mqttConn->clientId) - 1);
     strncpy(mqttConn->clientPassword, gwdev.token, sizeof(mqttConn->clientPassword) - 1);
@@ -77,6 +77,8 @@ void iotgw_mqtt_proc()
 
     iotgw_cmft_publish_gateway_info(mqttConn, IOTGW_DATA_FILE, 0);
 
+#if 0
+
     for (i = 0; i < 30; i++) {
         waitcount = 50;
         while (waitcount-- > 0) {
@@ -88,6 +90,20 @@ void iotgw_mqtt_proc()
 
         sleep(15);
     }
+#endif
+
+    for (i = 0; i < 100; i++) {
+        gwdev.OnlineSubDeviceCount++;
+        gwdev.TotalSubDeviceCount++;
+        
+        INFO_PRT("\nPublish gateway dynamic information for OnlineSubDeviceCount=%d TotalSubDeviceCount=%d", gwdev.OnlineSubDeviceCount, gwdev.TotalSubDeviceCount);
+        iotgw_cmft_publish_gateway_info(mqttConn, IOTGW_DATA_FILE, 0);
+        iotgw_cmft_publish_subdev_info(mqttConn, 0);
+        iotgw_mqtt_waitForAllCompletion(mqttConn->handle, IOTGW_MQTT_TIMEOUT * 1000);
+
+        sleep(15);
+    }
+
 
 }
 
@@ -255,4 +271,5 @@ int iotgw_cmft_publish_subdev_info(struct iotgw_mqtt_conn *mqttConn, unsigned lo
         MQTTAsync_waitForCompletion(mqttConn->handle, pubtoken, waitFinishedMS);
     }
     return 0;
+
 }

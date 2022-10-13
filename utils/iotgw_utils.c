@@ -130,12 +130,12 @@ int iot_cmft_get_token_mqtt(const char *pid, const char *did, const char *sec, c
 
 int iotgw_load_conf(struct iotgw_dev *dev, const char *filename)
 {
-    json_object *jso_root = NULL, *jso_gateway = NULL;
+    json_object *jso_root = NULL, *jso_iotmqtt = NULL, *jso_gateway = NULL;
 	int retval = -1, fd = -1;
      
 	if ((fd = open(filename, O_RDONLY, 0)) < 0)
 	{
-		ERR_PRT("Unable to gateway configure file %s: %s", filename, strerror(errno));
+		ERR_PRT("Unable to find gateway configure file %s: %s", filename, strerror(errno));
 		goto ret;
 	}
 	if ((jso_root = json_object_from_fd(fd)) == NULL) {
@@ -148,8 +148,14 @@ int iotgw_load_conf(struct iotgw_dev *dev, const char *filename)
     dev->OnlineSubDeviceCount = json_object_get_int(json_object_object_get(jso_root, "OnlineSubDeviceCount"));
     dev->TotalSubDeviceCount = json_object_get_int(json_object_object_get(jso_root, "TotalSubDeviceCount"));
 
+    if (!json_object_object_get_ex(jso_root, "iotmqtt", &jso_iotmqtt)) {
+        ERR_PRT("Can't find iotmqtt field in JSON file %s", filename);
+        goto ret;
+    }
+    strncpy(dev->uri, json_object_get_string(json_object_object_get(jso_iotmqtt, "URI")) ? : "", sizeof(dev->uri) - 1);
+
     if (!json_object_object_get_ex(jso_root, "gateway", &jso_gateway)) {
-        ERR_PRT("Can't find jso_gateway field in JSON file %s", filename);
+        ERR_PRT("Can't find gateway field in JSON file %s", filename);
         goto ret;
     }
     strncpy(dev->pid, json_object_get_string(json_object_object_get(jso_gateway, "productId")) ? : "", sizeof(dev->pid) - 1);

@@ -3,8 +3,6 @@
 
 #include "iotgw_mqtt_client.h"
 
-#define IOTGW_CMFT_SERVER_URI       "tcp://mqtt.iot.cmft.com:30001"
-
 int iotgw_mqtt_init();
 
 int iotgw_mqtt_exit();

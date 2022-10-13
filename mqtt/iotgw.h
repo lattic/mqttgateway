@@ -6,13 +6,14 @@
 #define IOTGW_DEFAULT_QOS               1
 #define IOTGW_DEFAULT_KEEPALIVE         30
 
-#define IOTGW_CONFIG_FILE      "/Volumes/Apps/MyWork/iotgw/mqttgateway/conf.json"
-#define IOTGW_DATA_FILE        "/Volumes/Apps/MyWork/iotgw/mqttgateway/gateway.json"
+#define IOTGW_CONFIG_FILE      "conf.json"
+#define IOTGW_DATA_FILE        "gateway.json"
 #define IOTGW_IDSTR_LEN        16
 #define IOTGW_SECSTR_LEN       32
 #define IOTGW_TOKEN_LEN        128
 
 typedef struct iotgw_dev {
+    char uri[256];
     char pid[IOTGW_IDSTR_LEN];
     char did[IOTGW_IDSTR_LEN];
     char sec[IOTGW_SECSTR_LEN];
