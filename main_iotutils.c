@@ -1,28 +1,50 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
+#include "iotgw.h"
 #include "iotgw_utils.h"
 
-#if 0
-$sys/104841/10654986/thing/property/post
+void show_usage()
 {
-  "params": {
-    "DeviceStatus": { "value": "RUNNING"}
-  }
+    printf("\nUsage: iotutils token|subdev \n"
+        "\tiotutils token PRODUCT_ID DEVICE_ID SECRET\n"
+        "\tiotutils subdev\n");
+    return;
 }
-#endif
-
 
 int main(int argc, char **argv)
 {
-    char token[256];
+    char token[256], *pid, *did, *sec;
 
-    printf("IOT MQTT Gateway Utils\n");
-    iot_cmft_get_token_mqtt("104841", "10654986", "Y2JjOWRhNzI2N2M5ZjdjM2JkZmY=", token, sizeof(token));
-    printf("Token: %s\n", token);
+
+    if (argc == 5 && strcmp(argv[1], "token") == 0) {
+        /* iotutils token|xxx PRODUCT_ID DEVICE_ID SECRET */
+        pid = argv[2];
+        did = argv[3];
+        sec = argv[4];
+        if ((pid == NULL || strlen(pid) != 6) ||
+            (did == NULL || strlen(did) != 8) ||
+            (sec == NULL || strlen(sec) != 28)) {
+            printf("Cracked as PID=%s DID=%s SEC=%s\n", pid, did, sec);
+            goto err;
+        }
+        iot_cmft_get_token_mqtt(pid, did, sec, token, sizeof(token));
+        printf("Token: %s\n", token);
+    }
+    else 
+    {
+        goto err;
+    }
+
     return 0;
+
+err:
+    show_usage();
+    return -1;
 }
+
 
 
 
